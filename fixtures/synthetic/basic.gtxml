@@ -1,0 +1,39 @@
+<Composition Width="1920" Height="1080">
+  <Layer Name="Layer 1" Dimensions="1920,1080,0" Locked="False">
+    <Layer.Composition>
+      <Composition Width="1920" Height="1080">
+        <Rectangle Name="Rect 1" Dimensions="1000,100,0" Location="0,800,0">
+          <Rectangle.Bounding>
+            <Bounding Object="Text 1" Padding="15,15,15,15"/>
+          </Rectangle.Bounding>
+          <Rectangle.Fill>
+            <Brush Color="#FFFF0000"/>
+          </Rectangle.Fill>
+          <Rectangle.Stroke>
+            <Brush Color="#00000000"/>
+          </Rectangle.Stroke>
+        </Rectangle>
+        <Ellipse Name="Circle 1" Dimensions="120,120,0" Location="40,40,0">
+          <Ellipse.Fill>
+            <Brush Color="#FF00AAFF"/>
+          </Ellipse.Fill>
+        </Ellipse>
+        <Triangle Name="Tri 1" Dimensions="80,80,0" Location="200,40,0">
+          <Triangle.Fill>
+            <Brush Color="#FFFFFF00"/>
+          </Triangle.Fill>
+        </Triangle>
+        <TextBlock Name="Text 1" Dimensions="1860,100,0" Location="60,800,0" Text="HERE WE ARE" FontFamily="Arial" FontSize="48" FontWeight="Bold" TextAlign="Left" VerticalAlign="Center" WordWrapping="NoWrap">
+          <TextBlock.Fill>
+            <Brush Color="#FFFFFFFF"/>
+          </TextBlock.Fill>
+        </TextBlock>
+      </Composition>
+    </Layer.Composition>
+  </Layer>
+  <Storyboard Type="TransitionIn">
+    <Storyboard.Animations>
+      <Reveal Object="Rect 1" Duration="2" Delay="0" Interpolation="Linear" Direction="Left"/>
+    </Storyboard.Animations>
+  </Storyboard>
+</Composition>
