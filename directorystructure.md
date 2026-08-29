@@ -3,7 +3,8 @@
 ```
 gt-parser/
   Cargo.toml                 # workspace（gt-core, gt-cli）
-  rust-toolchain.toml        # channel = stable
+  rust-toolchain.toml        # channel = stable, rustfmt/clippy
+  .github/workflows/ci.yml   # fmt / clippy / test / CLI smoke
   crates/gt-core/            # パッケージ読込・IR・パーサ・HTML レンダラ
   crates/gt-cli/             # バイナリ `gt-parser`
   crates/gt-wasm/            # 未作成。第6段 Issue で追加
@@ -26,4 +27,4 @@ gt-parser/
 | `render::html` | IR → HTML/CSS |
 | `warn` | 警告コード |
 
-CLI・将来の Wasm / Web はすべて `gt-core` のみを呼び、変換ロジックを複製しない。
+CLI・将来の Wasm / Web はすべて `gt-core` のみを呼び、変換ロジックを複製しない。ファイル I/O の標準は Tokio（`Package::open` / `convert_path` / CLI は async）。`convert_package` と XML パースは同期のままとする。

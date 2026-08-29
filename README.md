@@ -5,6 +5,7 @@ vMix GT Title Designer の `.gtzip` / `.gtxml` を解析し、HTML に変換す�
 ## 必要環境
 
 - Rust stable（検証: 1.98.0 / edition 2024）
+- 非同期ランタイムは Tokio 1.53.1（CLI は `#[tokio::main]`）
 
 ## ビルド
 
@@ -45,5 +46,9 @@ gt-parser inspect path/to/title.gtzip
 - #6 第5段: Ticker / QR / Text3D / Image Sequence
 - #7 第6段: Wasm グラフィック要素と Web 運用
 - #8 第7段: 運用形態
+
+## CI
+
+GitHub Actions（`.github/workflows/ci.yml`）で `cargo fmt`、`clippy`、`test`、CLI のスモーク実行を行います。
 
 詳細は [technologystack.md](technologystack.md)、[directorystructure.md](directorystructure.md)、[docs/FORMAT.md](docs/FORMAT.md) を参照。

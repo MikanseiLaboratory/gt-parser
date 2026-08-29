@@ -32,9 +32,9 @@ fn make_gtzip(xml: &str, stored: bool) -> Vec<u8> {
     zip.finish().unwrap().into_inner()
 }
 
-#[test]
-fn parses_basic_gtxml_objects() {
-    let conversion = convert_path(fixture("basic.gtxml")).unwrap();
+#[tokio::test]
+async fn parses_basic_gtxml_objects() {
+    let conversion = convert_path(fixture("basic.gtxml")).await.unwrap();
     let report = conversion.document.inspect_report();
     assert_eq!(report.width, 1920.0);
     assert_eq!(report.height, 1080.0);
@@ -72,9 +72,9 @@ fn parses_basic_gtxml_objects() {
     assert!(conversion.html.contains("data-gt-type=\"Triangle\""));
 }
 
-#[test]
-fn preserves_unknown_nodes_and_escapes_text() {
-    let conversion = convert_path(fixture("unknown.gtxml")).unwrap();
+#[tokio::test]
+async fn preserves_unknown_nodes_and_escapes_text() {
+    let conversion = convert_path(fixture("unknown.gtxml")).await.unwrap();
     let layer = &conversion.document.layers[0];
     let objects: Vec<_> = layer
         .objects
@@ -98,9 +98,11 @@ fn preserves_unknown_nodes_and_escapes_text() {
     assert!(!conversion.html.contains("data-gt-type=\"Image\""));
 }
 
-#[test]
-fn utf16_gtzip_stored_and_deflated() {
-    let xml = std::fs::read_to_string(fixture("basic.gtxml")).unwrap();
+#[tokio::test]
+async fn utf16_gtzip_stored_and_deflated() {
+    let xml = tokio::fs::read_to_string(fixture("basic.gtxml"))
+        .await
+        .unwrap();
     for stored in [true, false] {
         let bytes = make_gtzip(&xml, stored);
         let package = Package::from_zip_bytes(PathBuf::from("memory.gtzip"), &bytes).unwrap();
@@ -132,20 +134,21 @@ fn decode_utf16_without_bom_when_xml_marker_present() {
     assert_eq!(decode_xml_bytes(&bytes).unwrap(), xml);
 }
 
-#[test]
-fn golden_html_matches_basic_fixture() {
-    let conversion = convert_path(fixture("basic.gtxml")).unwrap();
-    let expected = std::fs::read_to_string(
+#[tokio::test]
+async fn golden_html_matches_basic_fixture() {
+    let conversion = convert_path(fixture("basic.gtxml")).await.unwrap();
+    let expected = tokio::fs::read_to_string(
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/golden/basic.html"),
     )
+    .await
     .unwrap()
     .replace("\r\n", "\n");
     assert_eq!(conversion.html.replace("\r\n", "\n"), expected);
 }
 
-#[test]
-fn solid_fill_parsed_from_brush() {
-    let conversion = convert_path(fixture("basic.gtxml")).unwrap();
+#[tokio::test]
+async fn solid_fill_parsed_from_brush() {
+    let conversion = convert_path(fixture("basic.gtxml")).await.unwrap();
     let rect = conversion.document.layers[0]
         .objects
         .iter()

@@ -1,4 +1,3 @@
-use std::fs;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
@@ -47,21 +46,23 @@ enum OutputFormat {
     Html,
 }
 
-fn main() -> Result<()> {
+#[tokio::main]
+async fn main() -> Result<()> {
     match Cli::parse().command {
         Command::Convert {
             input,
             output,
             format: OutputFormat::Html,
             embed_assets,
-        } => convert(&input, output, embed_assets),
-        Command::Inspect { input, json: _ } => inspect(&input),
+        } => convert(&input, output, embed_assets).await,
+        Command::Inspect { input, json: _ } => inspect(&input).await,
     }
 }
 
-fn convert(input: &Path, output: Option<PathBuf>, embed_assets: bool) -> Result<()> {
-    let mut conversion =
-        convert_path(input).with_context(|| format!("failed to convert {}", input.display()))?;
+async fn convert(input: &Path, output: Option<PathBuf>, embed_assets: bool) -> Result<()> {
+    let mut conversion = convert_path(input)
+        .await
+        .with_context(|| format!("failed to convert {}", input.display()))?;
     if embed_assets {
         conversion.warnings.push(gt_core::Warning::new(
             "unsupported.embed_assets",
@@ -69,14 +70,17 @@ fn convert(input: &Path, output: Option<PathBuf>, embed_assets: bool) -> Result<
         ));
     }
     let outdir = output.unwrap_or_else(|| default_output_dir(input));
-    fs::create_dir_all(&outdir)
+    tokio::fs::create_dir_all(&outdir)
+        .await
         .with_context(|| format!("failed to create {}", outdir.display()))?;
-    fs::write(outdir.join("index.html"), conversion.html.as_bytes())
+    tokio::fs::write(outdir.join("index.html"), conversion.html.as_bytes())
+        .await
         .with_context(|| format!("failed to write {}", outdir.join("index.html").display()))?;
-    fs::write(
+    tokio::fs::write(
         outdir.join("warnings.json"),
         serde_json::to_vec_pretty(&conversion.warnings)?,
     )
+    .await
     .with_context(|| format!("failed to write {}", outdir.join("warnings.json").display()))?;
     println!("wrote {}", outdir.join("index.html").display());
     if !conversion.warnings.is_empty() {
@@ -88,9 +92,10 @@ fn convert(input: &Path, output: Option<PathBuf>, embed_assets: bool) -> Result<
     Ok(())
 }
 
-fn inspect(input: &Path) -> Result<()> {
-    let report =
-        inspect_path(input).with_context(|| format!("failed to inspect {}", input.display()))?;
+async fn inspect(input: &Path) -> Result<()> {
+    let report = inspect_path(input)
+        .await
+        .with_context(|| format!("failed to inspect {}", input.display()))?;
     println!("{}", serde_json::to_string_pretty(&report)?);
     Ok(())
 }

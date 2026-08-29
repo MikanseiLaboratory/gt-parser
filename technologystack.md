@@ -12,6 +12,7 @@
 | Edition | 2024 |
 | MSRV | 1.98（検証時の stable。`zip` 8.6 は 1.88 以上） |
 | Cargo workspace resolver | 3 |
+| CI | GitHub Actions（fmt / clippy / test / CLI smoke） |
 
 ## クレート（第1段）
 
@@ -26,6 +27,9 @@
 | serde | 1.0.229 | inspect / warnings の JSON |
 | serde_json | 1.0.151 | JSON 入出力 |
 | pretty_assertions | 1.4.1 | テスト差分 |
+| tokio | 1.53.1 | 非同期ランタイム。I/O と CLI の標準。`fs` / `rt` / `rt-multi-thread` / `macros` / `io-util` / `sync` |
+
+I/O は `tokio::fs` と `tokio::task::spawn_blocking`（ZIP 展開）を標準とする。XML パースと HTML 生成は CPU 処理のため同期関数のまま呼び出す。CLI は `#[tokio::main]`（マルチスレッド runtime）を使う。
 
 第1段では画像デコーダを入れない。アセットはパッケージ内のバイト列として保持するだけとする。
 

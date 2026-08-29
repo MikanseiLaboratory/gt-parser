@@ -16,3 +16,4 @@ anyhow.workspace = true
 clap.workspace = true
 gt-core = { path = "../gt-core" }
 serde_json.workspace = true
+tokio.workspace = true

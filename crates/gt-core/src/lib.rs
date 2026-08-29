@@ -22,8 +22,8 @@ pub struct Conversion {
     pub warnings: Vec<Warning>,
 }
 
-pub fn convert_path(path: impl AsRef<Path>) -> Result<Conversion> {
-    let package = Package::open(path)?;
+pub async fn convert_path(path: impl AsRef<Path>) -> Result<Conversion> {
+    let package = Package::open(path).await?;
     convert_package(&package)
 }
 
@@ -40,6 +40,6 @@ pub fn convert_package(package: &Package) -> Result<Conversion> {
     })
 }
 
-pub fn inspect_path(path: impl AsRef<Path>) -> Result<InspectReport> {
-    Ok(convert_path(path)?.document.inspect_report())
+pub async fn inspect_path(path: impl AsRef<Path>) -> Result<InspectReport> {
+    Ok(convert_path(path).await?.document.inspect_report())
 }

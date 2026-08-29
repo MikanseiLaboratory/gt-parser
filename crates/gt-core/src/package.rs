@@ -21,19 +21,20 @@ pub struct Package {
 }
 
 impl Package {
-    pub fn open(path: impl AsRef<Path>) -> Result<Self> {
-        let path = path.as_ref();
+    pub async fn open(path: impl AsRef<Path>) -> Result<Self> {
+        let path = path.as_ref().to_path_buf();
         let ext = path
             .extension()
             .and_then(|ext| ext.to_str())
             .unwrap_or("")
             .to_ascii_lowercase();
+        let bytes = tokio::fs::read(&path).await?;
         match ext.as_str() {
-            "gtzip" | "zip" => Self::open_gtzip(path),
-            "gtxml" | "xml" => Self::open_gtxml(path),
-            _ => Err(Error::UnsupportedInput {
-                path: path.to_path_buf(),
-            }),
+            "gtzip" | "zip" => {
+                tokio::task::spawn_blocking(move || Self::from_zip_bytes(path, &bytes)).await?
+            }
+            "gtxml" | "xml" => Self::from_xml_bytes(path, &bytes, PackageKind::Gtxml),
+            _ => Err(Error::UnsupportedInput { path }),
         }
     }
 
@@ -44,16 +45,6 @@ impl Package {
             document_xml: decode_xml_bytes(bytes)?,
             files: BTreeMap::new(),
         })
-    }
-
-    fn open_gtxml(path: &Path) -> Result<Self> {
-        let bytes = std::fs::read(path)?;
-        Self::from_xml_bytes(path.to_path_buf(), &bytes, PackageKind::Gtxml)
-    }
-
-    fn open_gtzip(path: &Path) -> Result<Self> {
-        let bytes = std::fs::read(path)?;
-        Self::from_zip_bytes(path.to_path_buf(), &bytes)
     }
 
     pub fn from_zip_bytes(path: PathBuf, bytes: &[u8]) -> Result<Self> {
