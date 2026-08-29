@@ -37,6 +37,13 @@ gt-parser inspect path/to/title.gtzip
 
 ## まだできないこと
 
-画像、グラデーション、エフェクト、アニメーション、Ticker / Text3D / QR、Web UI、Wasm グラフィック要素。これらは GitHub Issue（第2段以降）で追跡する。
+画像、グラデーション、エフェクト、アニメーション、Ticker / Text3D / QR、Web UI、Wasm グラフィック要素。これらは Issue で追跡します。
+
+- #3 第2段: 画像・グラデーション・Bounding
+- #4 第3段: エフェクトと合成
+- #5 第4段: Storyboard / アニメーション
+- #6 第5段: Ticker / QR / Text3D / Image Sequence
+- #7 第6段: Wasm グラフィック要素と Web 運用
+- #8 第7段: 運用形態
 
 詳細は [technologystack.md](technologystack.md)、[directorystructure.md](directorystructure.md)、[docs/FORMAT.md](docs/FORMAT.md) を参照。
