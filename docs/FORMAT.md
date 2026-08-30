@@ -78,7 +78,7 @@ pyGTGraphics は `ZIP_STORED` で書くが、DEFLATE も読む。
 
 ## 画像
 
-- Size Mode: Normal / Stretch / Centered（既定 Stretch）
+- Size Mode: Normal / Stretch / Centered。XML に無い場合は縦横比を保ってボックス内に収める（`contain` + 左上）。Stretch を既定にすると実タイトルで画像が潰れる
 - ZIP 内バイトは `resources.xml` の `guid` で引く。見つからなければパス直指定も試す
 
 ## Bounding / 配置

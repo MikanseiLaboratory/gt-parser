@@ -174,6 +174,8 @@ async fn solid_fill_parsed_from_brush() {
 async fn images_and_picture_fill_emit_assets() {
     let conversion = convert_path(fixture("image.gtxml")).await.unwrap();
     assert!(conversion.html.contains("data-gt-type=\"Image\""));
+    assert!(conversion.html.contains("object-fit:fill"));
+    assert!(conversion.html.contains("object-fit:contain"));
     assert!(conversion.html.contains("assets/tiny.png") || conversion.html.contains("tiny.png"));
     assert!(conversion.html.contains("url(#gt-pat-"));
     assert!(!conversion.assets.is_empty());

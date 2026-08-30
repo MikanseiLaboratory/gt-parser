@@ -38,7 +38,7 @@ gt-parser inspect path/to/title.gtzip
 
 - Composition / Layer / TextBlock / Rectangle / Ellipse / Triangle
 - Image（`Image.Bitmap` + `resources.xml` の GUID 対応、GTXML の相対パス）
-- Picture Fill、Linear / Radial Gradient、Size Mode（Normal / Stretch / Centered）
+- Picture Fill、Linear / Radial Gradient、Size Mode（未指定は縦横比維持の contain、明示の Normal / Stretch / Centered）
 - Bounding + Padding の静的解決、Radius、Rotate
 - Opacity、Shadow、Crop + Feather、Mask、Skew、Texture Flip、Reflection 近似
 - Compositing: Blend は標準。Replace / Additive は `mix-blend-mode` で近似し警告

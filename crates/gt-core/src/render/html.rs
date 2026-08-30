@@ -33,6 +33,9 @@ const STATIC_CSS: &str = r#"html, body {
   height: 100%;
   overflow: visible;
 }
+.gt-image {
+  overflow: hidden;
+}
 .gt-image img, .gt-image-frame {
   display: block;
   width: 100%;
@@ -746,11 +749,12 @@ fn crop_css(range: Option<&str>) -> String {
 
 fn size_mode_css(mode: Option<&str>) -> String {
     match mode.map(normalize).as_deref() {
+        Some("stretch") | Some("fill") => "object-fit:fill;".to_string(),
         Some("normal") => "object-fit:none;object-position:0 0;".to_string(),
-        Some("centered") | Some("contain") => {
+        Some("centered") | Some("center") => {
             "object-fit:contain;object-position:center;".to_string()
         }
-        _ => "object-fit:fill;".to_string(),
+        _ => "object-fit:contain;object-position:0 0;".to_string(),
     }
 }
 

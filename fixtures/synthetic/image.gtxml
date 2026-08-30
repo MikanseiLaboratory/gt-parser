@@ -7,6 +7,11 @@
             <Bitmap Source="tiny.png"/>
           </Image.Bitmap>
         </Image>
+        <Image Name="Native" Dimensions="10,80,0" Location="10,100,0">
+          <Image.Bitmap>
+            <Bitmap Source="tiny.png"/>
+          </Image.Bitmap>
+        </Image>
         <Rectangle Name="PicFill" Dimensions="80,80,0" Location="120,10,0">
           <Rectangle.Fill>
             <Picture Source="tiny.png" SizeMode="Stretch"/>
