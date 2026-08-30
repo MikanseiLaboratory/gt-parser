@@ -1,0 +1,15 @@
+<Composition Width="1280" Height="720" ExtraRoot="1">
+  <Layer Name="Main" Dimensions="1280,720,0">
+    <Layer.Composition>
+      <Composition Width="1280" Height="720">
+        <Image Name="Logo" Dimensions="100,100,0" Location="10,10,0"/>
+        <TextBlock Name="Title" Dimensions="400,80,0" Location="120,10,0" Text="Hello &amp; GT" FontFamily="Segoe UI" FontSize="32">
+          <TextBlock.Fill>
+            <Brush Color="#FF112233"/>
+          </TextBlock.Fill>
+        </TextBlock>
+        <FutureWidget Name="Preview" Custom="yes"/>
+      </Composition>
+    </Layer.Composition>
+  </Layer>
+</Composition>

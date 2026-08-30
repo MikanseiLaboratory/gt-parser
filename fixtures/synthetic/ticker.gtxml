@@ -1,0 +1,20 @@
+<Composition Width="640" Height="80">
+  <Layer Name="Layer 1" Dimensions="640,80,0">
+    <Layer.Composition>
+      <Composition Width="640" Height="80">
+        <Ticker Name="Ticker1" Dimensions="640,40,0" Location="0,20,0" FontFamily="Arial" TextAlign="Left" VerticalAlign="Center" Speed="4" Direction="Left">
+          <Ticker.Fill>
+            <Brush Color="#FFFFFFFF"/>
+          </Ticker.Fill>
+          <Ticker.Template>
+            <TextBlock Name="Inner" Text="BREAKING NEWS" FontSize="24">
+              <TextBlock.Fill>
+                <Brush Color="#FFFFFFFF"/>
+              </TextBlock.Fill>
+            </TextBlock>
+          </Ticker.Template>
+        </Ticker>
+      </Composition>
+    </Layer.Composition>
+  </Layer>
+</Composition>

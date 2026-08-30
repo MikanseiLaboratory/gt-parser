@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GT Title</title>
+<style>
+html, body {
+  margin: 0;
+  background: transparent;
+}
+.gt-stage {
+  position: relative;
+  overflow: hidden;
+  background: transparent;
+}
+.gt-layer, .gt-object {
+  position: absolute;
+  box-sizing: border-box;
+}
+.gt-text {
+  display: flex;
+  overflow: hidden;
+}
+.gt-shape {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.gt-image {
+  overflow: hidden;
+}
+.gt-image img, .gt-image-frame {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.gt-ticker {
+  overflow: hidden;
+}
+.gt-ticker-track {
+  display: inline-flex;
+  white-space: nowrap;
+  will-change: transform;
+}
+@keyframes gt-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes gt-fade-out { from { opacity: 1; } to { opacity: 0; } }
+@keyframes gt-reveal-left { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0); } }
+@keyframes gt-reveal-right { from { clip-path: inset(0 0 0 100%); } to { clip-path: inset(0); } }
+@keyframes gt-reveal-top { from { clip-path: inset(100% 0 0 0); } to { clip-path: inset(0); } }
+@keyframes gt-reveal-bottom { from { clip-path: inset(0 0 100% 0); } to { clip-path: inset(0); } }
+@keyframes gt-reveal-center-x { from { clip-path: inset(0 50% 0 50%); } to { clip-path: inset(0); } }
+@keyframes gt-reveal-center-y { from { clip-path: inset(50% 0 50% 0); } to { clip-path: inset(0); } }
+@keyframes gt-fly-left { from { transform: translateX(-110%); } to { transform: none; } }
+@keyframes gt-fly-right { from { transform: translateX(110%); } to { transform: none; } }
+@keyframes gt-fly-top { from { transform: translateY(-110%); } to { transform: none; } }
+@keyframes gt-fly-bottom { from { transform: translateY(110%); } to { transform: none; } }
+@keyframes gt-zoomfade-in { from { opacity: 0; transform: scale(0.85); } to { opacity: 1; transform: none; } }
+@keyframes gt-scale-in { from { transform: scale(0); } to { transform: none; } }
+@keyframes gt-rotate-in { from { transform: rotate(-90deg); } to { transform: none; } }
+@keyframes gt-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@keyframes gt-ticker-left { from { transform: translateX(100%); } to { transform: translateX(-100%); } }
+@keyframes gt-ticker-right { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+@keyframes gt-ticker-top { from { transform: translateY(100%); } to { transform: translateY(-100%); } }
+@keyframes gt-ticker-bottom { from { transform: translateY(-100%); } to { transform: translateY(100%); } }
+@keyframes gt-bounce-in {
+  0% { transform: scale(0.3); }
+  20% { transform: scale(1.1); }
+  40% { transform: scale(0.9); }
+  60% { transform: scale(1.03); }
+  80% { transform: scale(0.97); }
+  100% { transform: none; }
+}
+@keyframes gt-bounce-out {
+  0% { transform: none; }
+  20% { transform: scale(0.9); }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(0.3); opacity: 0; }
+}
+
+</style>
+</head>
+<body>
+<div class="gt-stage" style="width:1920.000px;height:1080.000px;">
+  <div class="gt-layer" data-gt-name="Layer 1" data-gt-type="Layer" style="left:0.000px;top:0.000px;width:1920.000px;height:1080.000px;">
+    <div class="gt-object" data-gt-name="Rect 1" data-gt-type="Rectangle" style="left:45.000px;top:785.000px;width:1890.000px;height:130.000px;animation:gt-reveal-left 2.000s linear 0.000s 1 normal both;"><svg class="gt-shape"><rect x="0" y="0" width="100%" height="100%" rx="0.000" ry="0.000" fill="#FF0000" stroke="none" stroke-width="0.000"/></svg></div>
+    <div class="gt-object" data-gt-name="Circle 1" data-gt-type="Ellipse" style="left:40.000px;top:40.000px;width:120.000px;height:120.000px;"><svg class="gt-shape"><ellipse cx="50%" cy="50%" rx="50%" ry="50%" fill="#00AAFF" stroke="none" stroke-width="0.000"/></svg></div>
+    <div class="gt-object" data-gt-name="Tri 1" data-gt-type="Triangle" style="left:200.000px;top:40.000px;width:80.000px;height:80.000px;"><svg class="gt-shape" viewBox="0 0 100 100" preserveAspectRatio="none"><polygon points="50,0 100,100 0,100" fill="#FFFF00" stroke="none" stroke-width="0.000" vector-effect="non-scaling-stroke"/></svg></div>
+    <div class="gt-object gt-text" data-gt-name="Text 1" data-gt-type="TextBlock" style="left:60.000px;top:800.000px;width:1860.000px;height:100.000px;font-family:&quot;Arial&quot;,sans-serif;font-size:48.000px;font-weight:700;justify-content:flex-start;align-items:center;white-space:nowrap;color:#FFFFFF;">HERE WE ARE</div>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,24 @@
+<Composition Width="400" Height="200">
+  <Layer Name="Layer 1" Dimensions="400,200,0">
+    <Layer.Composition>
+      <Composition Width="400" Height="200">
+        <Rectangle Name="Grad" Dimensions="200,100,0" Location="10,10,0" Radius="8" Rotate="15">
+          <Rectangle.Fill>
+            <LinearGradientBrush Angle="90" Wrap="Mirror">
+              <GradientStop Color="#FFFF0000" Offset="0"/>
+              <GradientStop Color="#FF0000FF" Offset="1"/>
+            </LinearGradientBrush>
+          </Rectangle.Fill>
+        </Rectangle>
+        <Ellipse Name="Radial" Dimensions="80,100,0" Location="230,20,0">
+          <Ellipse.Fill>
+            <RadialGradientBrush Wrap="Clamp">
+              <GradientStop Color="#FFFFFFFF" Offset="0"/>
+              <GradientStop Color="#FF000000" Offset="1"/>
+            </RadialGradientBrush>
+          </Ellipse.Fill>
+        </Ellipse>
+      </Composition>
+    </Layer.Composition>
+  </Layer>
+</Composition>
