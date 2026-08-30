@@ -112,9 +112,28 @@ pub struct Bounding {
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum FillKind {
-    Solid { color: Color },
+    Solid {
+        color: Color,
+    },
     Transparent,
-    Unsupported { detail: String, node: UnknownNode },
+    LinearGradient {
+        angle: f64,
+        wrap: Option<String>,
+        stops: Vec<GradientStop>,
+    },
+    RadialGradient {
+        wrap: Option<String>,
+        stops: Vec<GradientStop>,
+    },
+    Picture {
+        source: String,
+        size_mode: Option<String>,
+        extra: BTreeMap<String, String>,
+    },
+    Unsupported {
+        detail: String,
+        node: UnknownNode,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -169,11 +188,43 @@ pub struct TextStyle {
     pub ignore_overhang: Option<String>,
     pub line_spacing: Option<f64>,
     pub auto_size: Option<String>,
+    pub font_stretch: Option<String>,
     pub italic: bool,
     pub underline: bool,
     pub strikethrough: bool,
     pub auto_upper_case: bool,
     pub rtl: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct GradientStop {
+    pub color: Color,
+    pub offset: f64,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct ShadowEffect {
+    pub mode: Option<String>,
+    pub blur: Option<f64>,
+    pub color: Option<Color>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct CropEffect {
+    pub range: Option<String>,
+    pub feather: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Default)]
+pub struct ObjectEffects {
+    pub shadow: Option<ShadowEffect>,
+    pub crop: Option<CropEffect>,
+    pub mask: Option<String>,
+    pub skew: Option<Vec3>,
+    pub reflection: bool,
+    pub flip_x: bool,
+    pub flip_y: bool,
+    pub compositing: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -187,6 +238,7 @@ pub enum ObjectKind {
     Ticker,
     Text3D,
     QrCode,
+    ImageSequence,
     Unknown,
 }
 
@@ -201,6 +253,7 @@ impl ObjectKind {
             "Ticker" => Self::Ticker,
             "Text3D" | "TextBlock3D" => Self::Text3D,
             "QrCode" | "QRCode" | "QR" => Self::QrCode,
+            "ImageSequence" => Self::ImageSequence,
             _ => Self::Unknown,
         }
     }
@@ -215,6 +268,7 @@ impl ObjectKind {
             Self::Ticker => "Ticker",
             Self::Text3D => "Text3D",
             Self::QrCode => "QrCode",
+            Self::ImageSequence => "ImageSequence",
             Self::Unknown => "Unknown",
         }
     }
@@ -224,10 +278,11 @@ impl ObjectKind {
     }
 
     pub fn phase1_renderable(self) -> bool {
-        matches!(
-            self,
-            Self::TextBlock | Self::Rectangle | Self::Ellipse | Self::Triangle
-        )
+        self.renders_html()
+    }
+
+    pub fn renders_html(self) -> bool {
+        !matches!(self, Self::Unknown)
     }
 }
 
@@ -246,6 +301,14 @@ pub struct GtObject {
     pub rotate: Option<f64>,
     pub radius: Option<f64>,
     pub opacity: Option<f64>,
+    pub visible: bool,
+    pub size_mode: Option<String>,
+    pub geometry: Option<String>,
+    pub image_source: Option<String>,
+    pub effects: ObjectEffects,
+    pub ticker_speed: Option<f64>,
+    pub ticker_direction: Option<String>,
+    pub ticker_kind: Option<String>,
     pub extra_attrs: BTreeMap<String, String>,
     pub unknown_children: Vec<UnknownNode>,
 }
@@ -266,6 +329,14 @@ impl GtObject {
             rotate: None,
             radius: None,
             opacity: None,
+            visible: true,
+            size_mode: None,
+            geometry: None,
+            image_source: None,
+            effects: ObjectEffects::default(),
+            ticker_speed: None,
+            ticker_direction: None,
+            ticker_kind: None,
             extra_attrs: BTreeMap::new(),
             unknown_children: Vec::new(),
         }
@@ -298,6 +369,8 @@ pub struct Animation {
     pub delay: Option<String>,
     pub interpolation: Option<String>,
     pub direction: Option<String>,
+    pub reversed: bool,
+    pub center_axis: Option<String>,
     pub extra_attrs: BTreeMap<String, String>,
 }
 
@@ -305,6 +378,7 @@ pub struct Animation {
 pub struct Storyboard {
     pub storyboard_type: Option<String>,
     pub reversed: bool,
+    pub data_name: Option<String>,
     pub animations: Vec<Animation>,
     pub extra_attrs: BTreeMap<String, String>,
     pub unknown_children: Vec<UnknownNode>,

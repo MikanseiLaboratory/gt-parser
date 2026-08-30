@@ -1,0 +1,24 @@
+<Composition Width="400" Height="200">
+  <Layer Name="Layer 1" Dimensions="400,200,0">
+    <Layer.Composition>
+      <Composition Width="400" Height="200">
+        <Text3D Name="Title3D" Dimensions="200,40,0" Location="10,10,0" Text="3D" FontFamily="Arial" FontSize="24" Geometry="Cube">
+          <Text3D.Fill>
+            <Brush Color="#FFFFFF00"/>
+          </Text3D.Fill>
+        </Text3D>
+        <QrCode Name="Code" Dimensions="80,80,0" Location="220,10,0">
+          <QrCode.Bitmap>
+            <Bitmap Source="tiny.png"/>
+          </QrCode.Bitmap>
+        </QrCode>
+        <QrCode Name="EmptyQR" Dimensions="40,80,0" Location="310,10,0"/>
+        <ImageSequence Name="Seq" Dimensions="40,40,0" Location="10,80,0">
+          <ImageSequence.Bitmap>
+            <Bitmap Source="tiny.png"/>
+          </ImageSequence.Bitmap>
+        </ImageSequence>
+      </Composition>
+    </Layer.Composition>
+  </Layer>
+</Composition>

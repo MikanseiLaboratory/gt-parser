@@ -16,27 +16,72 @@ pub use package::Package;
 pub use warn::Warning;
 
 #[derive(Debug, Clone)]
+pub struct ConvertOptions {
+    pub embed_assets: bool,
+    pub storyboard: String,
+}
+
+impl Default for ConvertOptions {
+    fn default() -> Self {
+        Self {
+            embed_assets: false,
+            storyboard: "TransitionIn".to_string(),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct OutputAsset {
+    pub relative_path: String,
+    pub bytes: Vec<u8>,
+}
+
+#[derive(Debug, Clone)]
 pub struct Conversion {
     pub document: GtDocument,
     pub html: String,
     pub warnings: Vec<Warning>,
+    pub assets: Vec<OutputAsset>,
 }
 
 pub async fn convert_path(path: impl AsRef<Path>) -> Result<Conversion> {
-    let package = Package::open(path).await?;
-    convert_package(&package)
+    convert_path_with(path, ConvertOptions::default()).await
+}
+
+pub async fn convert_path_with(
+    path: impl AsRef<Path>,
+    options: ConvertOptions,
+) -> Result<Conversion> {
+    let mut package = Package::open(path).await?;
+    let document = parse::parse_document(&package.document_xml)?;
+    package.load_external_images(&document).await?;
+    convert_package_with(&package, options, Some(document))
 }
 
 pub fn convert_package(package: &Package) -> Result<Conversion> {
-    let mut document = parse::parse_document(&package.document_xml)?;
+    convert_package_with(package, ConvertOptions::default(), None)
+}
+
+pub fn convert_package_with(
+    package: &Package,
+    options: ConvertOptions,
+    parsed: Option<GtDocument>,
+) -> Result<Conversion> {
+    let mut document = match parsed {
+        Some(document) => document,
+        None => parse::parse_document(&package.document_xml)?,
+    };
     document.asset_names = package.asset_names();
-    let warnings = resolve::collect_warnings(&document);
+    resolve::resolve_bounding(&mut document);
+    let rendered = render::html::render(&document, package, &options);
+    let mut warnings = resolve::collect_warnings(&document, &options);
+    warnings.extend(rendered.warnings);
     document.warnings = warnings.clone();
-    let html = render::html::render(&document);
     Ok(Conversion {
         document,
-        html,
+        html: rendered.html,
         warnings,
+        assets: rendered.assets,
     })
 }
 

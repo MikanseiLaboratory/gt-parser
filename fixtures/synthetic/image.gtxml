@@ -1,0 +1,18 @@
+<Composition Width="640" Height="360">
+  <Layer Name="Layer 1" Dimensions="640,360,0">
+    <Layer.Composition>
+      <Composition Width="640" Height="360">
+        <Image Name="Logo" Dimensions="100,80,0" Location="10,10,0" SizeMode="Stretch">
+          <Image.Bitmap>
+            <Bitmap Source="tiny.png"/>
+          </Image.Bitmap>
+        </Image>
+        <Rectangle Name="PicFill" Dimensions="80,80,0" Location="120,10,0">
+          <Rectangle.Fill>
+            <Picture Source="tiny.png" SizeMode="Stretch"/>
+          </Rectangle.Fill>
+        </Rectangle>
+      </Composition>
+    </Layer.Composition>
+  </Layer>
+</Composition>

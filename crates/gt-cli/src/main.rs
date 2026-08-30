@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand, ValueEnum};
-use gt_core::{convert_path, inspect_path};
+use gt_core::{ConvertOptions, convert_path_with, inspect_path};
 
 #[derive(Debug, Parser)]
 #[command(
@@ -27,9 +27,12 @@ enum Command {
         /// Output format
         #[arg(long, value_enum, default_value_t = OutputFormat::Html)]
         format: OutputFormat,
-        /// Embed assets as data URIs (phase 2; accepted for CLI compatibility)
+        /// Embed assets as data URIs
         #[arg(long)]
         embed_assets: bool,
+        /// Storyboard to play (default: TransitionIn)
+        #[arg(long, default_value = "TransitionIn")]
+        storyboard: String,
     },
     /// Print a JSON summary of the parsed title
     Inspect {
@@ -54,25 +57,40 @@ async fn main() -> Result<()> {
             output,
             format: OutputFormat::Html,
             embed_assets,
-        } => convert(&input, output, embed_assets).await,
+            storyboard,
+        } => convert(&input, output, embed_assets, storyboard).await,
         Command::Inspect { input, json: _ } => inspect(&input).await,
     }
 }
 
-async fn convert(input: &Path, output: Option<PathBuf>, embed_assets: bool) -> Result<()> {
-    let mut conversion = convert_path(input)
-        .await
-        .with_context(|| format!("failed to convert {}", input.display()))?;
-    if embed_assets {
-        conversion.warnings.push(gt_core::Warning::new(
-            "unsupported.embed_assets",
-            "--embed-assets is reserved for phase 2 image embedding",
-        ));
-    }
+async fn convert(
+    input: &Path,
+    output: Option<PathBuf>,
+    embed_assets: bool,
+    storyboard: String,
+) -> Result<()> {
+    let conversion = convert_path_with(
+        input,
+        ConvertOptions {
+            embed_assets,
+            storyboard,
+        },
+    )
+    .await
+    .with_context(|| format!("failed to convert {}", input.display()))?;
     let outdir = output.unwrap_or_else(|| default_output_dir(input));
     tokio::fs::create_dir_all(&outdir)
         .await
         .with_context(|| format!("failed to create {}", outdir.display()))?;
+    for asset in &conversion.assets {
+        let dest = outdir.join(&asset.relative_path);
+        if let Some(parent) = dest.parent() {
+            tokio::fs::create_dir_all(parent).await?;
+        }
+        tokio::fs::write(&dest, &asset.bytes)
+            .await
+            .with_context(|| format!("failed to write {}", dest.display()))?;
+    }
     tokio::fs::write(outdir.join("index.html"), conversion.html.as_bytes())
         .await
         .with_context(|| format!("failed to write {}", outdir.join("index.html").display()))?;

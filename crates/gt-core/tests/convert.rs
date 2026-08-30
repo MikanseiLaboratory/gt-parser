@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 use gt_core::model::{FillKind, ObjectKind};
 use gt_core::package::{Package, decode_xml_bytes};
-use gt_core::{convert_package, convert_path};
+use gt_core::{ConvertOptions, convert_package, convert_path, convert_path_with};
 use pretty_assertions::assert_eq;
 use zip::CompressionMethod;
 use zip::ZipWriter;
@@ -53,23 +53,28 @@ async fn parses_basic_gtxml_objects() {
             ("TextBlock", "Text 1"),
         ]
     );
-    assert!(
-        conversion
-            .warnings
-            .iter()
-            .any(|warning| warning.code == "unsupported.storyboard")
-    );
-    assert!(
-        conversion
-            .warnings
-            .iter()
-            .any(|warning| warning.code == "unsupported.bounding")
-    );
     assert!(conversion.html.contains("data-gt-name=\"Text 1\""));
     assert!(conversion.html.contains("HERE WE ARE"));
     assert!(conversion.html.contains("data-gt-type=\"Rectangle\""));
     assert!(conversion.html.contains("data-gt-type=\"Ellipse\""));
     assert!(conversion.html.contains("data-gt-type=\"Triangle\""));
+    assert!(conversion.html.contains("gt-reveal-left"));
+    let rect = conversion.document.layers[0]
+        .objects
+        .iter()
+        .find_map(|child| match child {
+            gt_core::model::LayerChild::Object(object) if object.name == "Rect 1" => Some(object),
+            _ => None,
+        })
+        .unwrap();
+    assert!((rect.location.x - 45.0).abs() < f64::EPSILON);
+    assert!((rect.dimensions.x - 1890.0).abs() < f64::EPSILON);
+    assert!(
+        !conversion
+            .warnings
+            .iter()
+            .any(|warning| warning.code == "unsupported.bounding")
+    );
 }
 
 #[tokio::test]
@@ -92,10 +97,10 @@ async fn preserves_unknown_nodes_and_escapes_text() {
         conversion
             .warnings
             .iter()
-            .any(|warning| warning.code == "unsupported.object.image")
+            .any(|warning| warning.code == "unsupported.image.source")
     );
     assert!(conversion.html.contains("Hello &amp; GT"));
-    assert!(!conversion.html.contains("data-gt-type=\"Image\""));
+    assert!(conversion.html.contains("data-gt-type=\"Image\""));
 }
 
 #[tokio::test]
@@ -163,4 +168,129 @@ async fn solid_fill_parsed_from_brush() {
         }
         other => panic!("expected solid fill, got {other:?}"),
     }
+}
+
+#[tokio::test]
+async fn images_and_picture_fill_emit_assets() {
+    let conversion = convert_path(fixture("image.gtxml")).await.unwrap();
+    assert!(conversion.html.contains("data-gt-type=\"Image\""));
+    assert!(conversion.html.contains("assets/tiny.png") || conversion.html.contains("tiny.png"));
+    assert!(conversion.html.contains("url(#gt-pat-"));
+    assert!(!conversion.assets.is_empty());
+}
+
+#[tokio::test]
+async fn embed_assets_uses_data_uri() {
+    let conversion = convert_path_with(
+        fixture("image.gtxml"),
+        ConvertOptions {
+            embed_assets: true,
+            storyboard: "TransitionIn".to_string(),
+        },
+    )
+    .await
+    .unwrap();
+    assert!(conversion.html.contains("data:image/png;base64,"));
+    assert!(conversion.assets.is_empty());
+}
+
+#[tokio::test]
+async fn gradients_rotate_and_radius_render() {
+    let conversion = convert_path(fixture("gradient.gtxml")).await.unwrap();
+    assert!(conversion.html.contains("linearGradient"));
+    assert!(conversion.html.contains("radialGradient"));
+    assert!(conversion.html.contains("rotate(15.000deg)"));
+    assert!(conversion.html.contains("rx=\"8.000\""));
+}
+
+#[tokio::test]
+async fn effects_opacity_shadow_crop_and_blend() {
+    let conversion = convert_path(fixture("effects.gtxml")).await.unwrap();
+    assert!(conversion.html.contains("opacity:0.500"));
+    assert!(conversion.html.contains("drop-shadow"));
+    assert!(conversion.html.contains("clip-path:inset"));
+    assert!(conversion.html.contains("mix-blend-mode:plus-lighter"));
+    assert!(conversion.html.contains("mask-image:url"));
+    assert!(
+        conversion
+            .warnings
+            .iter()
+            .any(|warning| warning.code == "approximate.compositing")
+    );
+}
+
+#[tokio::test]
+async fn storyboard_switch_changes_animation() {
+    let inn = convert_path(fixture("storyboard.gtxml")).await.unwrap();
+    assert!(inn.html.contains("gt-reveal-left"));
+    assert!(inn.html.contains("gt-fade-in"));
+    let out = convert_path_with(
+        fixture("storyboard.gtxml"),
+        ConvertOptions {
+            embed_assets: false,
+            storyboard: "TransitionOut".to_string(),
+        },
+    )
+    .await
+    .unwrap();
+    assert!(out.html.contains("gt-fly-bottom"));
+    assert!(!out.html.contains("animation:gt-reveal-left"));
+}
+
+#[tokio::test]
+async fn ticker_scrolls_from_template() {
+    let conversion = convert_path(fixture("ticker.gtxml")).await.unwrap();
+    assert!(conversion.html.contains("data-gt-type=\"Ticker\""));
+    assert!(conversion.html.contains("BREAKING NEWS"));
+    assert!(conversion.html.contains("gt-ticker-left"));
+}
+
+#[tokio::test]
+async fn specials_qr_text3d_and_empty_qr_warning() {
+    let conversion = convert_path(fixture("specials.gtxml")).await.unwrap();
+    assert!(conversion.html.contains("data-gt-type=\"Text3D\""));
+    assert!(conversion.html.contains("data-gt-type=\"QrCode\""));
+    assert!(conversion.html.contains("data-gt-type=\"ImageSequence\""));
+    assert!(
+        conversion
+            .warnings
+            .iter()
+            .any(|warning| warning.code == "approximate.text3d")
+    );
+    assert!(
+        conversion
+            .warnings
+            .iter()
+            .any(|warning| warning.code == "approximate.cube")
+    );
+    assert!(
+        conversion
+            .warnings
+            .iter()
+            .any(|warning| warning.code == "unsupported.qr.generation")
+    );
+}
+
+#[tokio::test]
+async fn gtzip_with_resources_maps_guid_images() {
+    let png = tokio::fs::read(fixture("tiny.png")).await.unwrap();
+    let xml = r#"<Composition Width="10" Height="10"><Layer Name="L" Dimensions="10,10,0"><Layer.Composition><Composition Width="10" Height="10"><Image Name="Pic" Dimensions="10,10,0" Location="0,0,0"><Image.Bitmap><Bitmap Source="folder\tiny.png"/></Image.Bitmap></Image></Composition></Layer.Composition></Layer></Composition>"#;
+    let cursor = Cursor::new(Vec::new());
+    let mut zip = ZipWriter::new(cursor);
+    let options = SimpleFileOptions::default().compression_method(CompressionMethod::Stored);
+    zip.start_file("document.xml", options).unwrap();
+    zip.write_all(xml.as_bytes()).unwrap();
+    zip.start_file("resources.xml", options).unwrap();
+    zip.write_all(
+        br#"<resources><resource filename="folder\tiny.png"><source guid="abc-guid">folder\tiny.png</source></resource></resources>"#,
+    )
+    .unwrap();
+    zip.start_file("abc-guid", options).unwrap();
+    zip.write_all(&png).unwrap();
+    let bytes = zip.finish().unwrap().into_inner();
+    let package = Package::from_zip_bytes(PathBuf::from("mapped.gtzip"), &bytes).unwrap();
+    let conversion = convert_package(&package).unwrap();
+    assert!(!conversion.assets.is_empty());
+    assert!(conversion.html.contains("data-gt-type=\"Image\""));
+    assert!(conversion.html.contains("assets/"));
 }
