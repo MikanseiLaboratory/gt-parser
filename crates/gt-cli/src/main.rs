@@ -2,13 +2,16 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand, ValueEnum};
-use gt_core::{ConvertOptions, convert_path_with, inspect_path};
+use gt_core::fields::list_fields;
+use gt_core::schema::{AUTHORING_SCHEMA_JSON, FORMAT_SUMMARY};
+use gt_core::write::{WriteAssets, write_gtzip_path};
+use gt_core::{ConvertOptions, Package, convert_package_with, convert_path_with, inspect_path};
 
 #[derive(Debug, Parser)]
 #[command(
     name = "gt-parser",
     version,
-    about = "Convert vMix GT Title Designer files (.gtzip / .gtxml) to HTML"
+    about = "Parse, preview, and write vMix GT Title Designer files"
 )]
 struct Cli {
     #[command(subcommand)]
@@ -19,29 +22,43 @@ struct Cli {
 enum Command {
     /// Convert a GT title into HTML
     Convert {
-        /// Path to a .gtzip or .gtxml file
         input: PathBuf,
-        /// Output directory (default: <input-stem>_html)
         #[arg(short, long)]
         output: Option<PathBuf>,
-        /// Output format
         #[arg(long, value_enum, default_value_t = OutputFormat::Html)]
         format: OutputFormat,
-        /// Embed assets as data URIs
         #[arg(long)]
         embed_assets: bool,
-        /// Storyboard to play (default: TransitionIn)
         #[arg(long, default_value = "TransitionIn")]
         storyboard: String,
     },
     /// Print a JSON summary of the parsed title
     Inspect {
-        /// Path to a .gtzip or .gtxml file
         input: PathBuf,
-        /// Always emit JSON (this is the default inspect format)
         #[arg(long)]
         json: bool,
     },
+    /// Write a .gtzip from a title or authoring IR JSON
+    Pack {
+        input: PathBuf,
+        #[arg(short, long)]
+        output: PathBuf,
+        /// Extra assets as name=path
+        #[arg(long = "asset", value_name = "NAME=PATH")]
+        assets: Vec<String>,
+    },
+    /// List vMix data fields
+    Fields { input: PathBuf },
+    /// Print the authoring JSON Schema
+    Schema,
+    /// Write a self-contained HTML preview
+    Preview {
+        input: PathBuf,
+        #[arg(short, long)]
+        output: Option<PathBuf>,
+    },
+    /// Run the MCP server on stdio
+    Mcp,
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
@@ -60,6 +77,23 @@ async fn main() -> Result<()> {
             storyboard,
         } => convert(&input, output, embed_assets, storyboard).await,
         Command::Inspect { input, json: _ } => inspect(&input).await,
+        Command::Pack {
+            input,
+            output,
+            assets,
+        } => pack(&input, &output, &assets).await,
+        Command::Fields { input } => fields(&input).await,
+        Command::Schema => {
+            println!("{FORMAT_SUMMARY}");
+            println!("{AUTHORING_SCHEMA_JSON}");
+            Ok(())
+        }
+        Command::Preview { input, output } => {
+            convert(&input, output, true, "TransitionIn".to_string()).await
+        }
+        Command::Mcp => gt_mcp::run_stdio()
+            .await
+            .map_err(|error| anyhow::anyhow!("{error}")),
     }
 }
 
@@ -116,6 +150,53 @@ async fn inspect(input: &Path) -> Result<()> {
         .with_context(|| format!("failed to inspect {}", input.display()))?;
     println!("{}", serde_json::to_string_pretty(&report)?);
     Ok(())
+}
+
+async fn fields(input: &Path) -> Result<()> {
+    let conversion = convert_path_with(input, ConvertOptions::default())
+        .await
+        .with_context(|| format!("failed to read {}", input.display()))?;
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&list_fields(&conversion.document))?
+    );
+    Ok(())
+}
+
+async fn pack(input: &Path, output: &Path, extra: &[String]) -> Result<()> {
+    let (document, mut assets) = load_authoring(input).await?;
+    for spec in extra {
+        let (name, path) = spec
+            .split_once('=')
+            .with_context(|| format!("asset must be name=path, got {spec}"))?;
+        let bytes = tokio::fs::read(path)
+            .await
+            .with_context(|| format!("failed to read {path}"))?;
+        assets.insert(name, bytes);
+    }
+    write_gtzip_path(output, &document, &assets)
+        .await
+        .with_context(|| format!("failed to write {}", output.display()))?;
+    println!("wrote {}", output.display());
+    Ok(())
+}
+
+async fn load_authoring(input: &Path) -> Result<(gt_core::GtDocument, WriteAssets)> {
+    let ext = input
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    if ext == "json" {
+        let text = tokio::fs::read_to_string(input).await?;
+        let document: gt_core::GtDocument = serde_json::from_str(&text)?;
+        return Ok((document, WriteAssets::default()));
+    }
+    let mut package = Package::open(input).await?;
+    let document = gt_core::parse::parse_document(&package.document_xml)?;
+    package.load_external_images(&document).await?;
+    let conversion = convert_package_with(&package, ConvertOptions::default(), Some(document))?;
+    Ok((conversion.document, WriteAssets::from_package(&package)))
 }
 
 fn default_output_dir(input: &Path) -> PathBuf {

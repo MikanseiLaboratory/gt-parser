@@ -5,42 +5,65 @@ use crate::model::{
 use crate::warn::Warning;
 
 pub fn resolve_bounding(document: &mut GtDocument) {
-    let snapshots: Vec<(String, Vec3, Vec3)> = document
-        .layers
-        .iter()
-        .flat_map(flatten_objects)
-        .map(|object| {
-            (
-                object.name.clone(),
-                object.location.clone(),
-                object.dimensions.clone(),
-            )
-        })
-        .collect();
     for layer in &mut document.layers {
-        resolve_layer_bounding(layer, &snapshots);
+        resolve_layer_bounding(layer);
     }
 }
 
-fn resolve_layer_bounding(layer: &mut Layer, snapshots: &[(String, Vec3, Vec3)]) {
+fn resolve_layer_bounding(layer: &mut Layer) {
     for child in &mut layer.objects {
-        match child {
-            LayerChild::Layer(nested) => resolve_layer_bounding(nested, snapshots),
-            LayerChild::Object(object) => {
-                if let Some(bounding) = object.bounding.clone()
-                    && let Some((_, location, dimensions)) = snapshots
-                        .iter()
-                        .find(|(name, _, _)| name == &bounding.object)
-                {
-                    let (left, top, right, bottom) = parse_padding(&bounding.padding);
-                    object.location.x = location.x - left;
-                    object.location.y = location.y - top;
-                    object.dimensions.x = dimensions.x + left + right;
-                    object.dimensions.y = dimensions.y + top + bottom;
-                }
-            }
+        if let LayerChild::Layer(nested) = child {
+            resolve_layer_bounding(nested);
         }
     }
+    let snapshots: Vec<(String, Vec3, Vec3, bool)> = flatten_objects(layer)
+        .into_iter()
+        .map(|object| {
+            (
+                object.name.clone(),
+                object.location,
+                object.dimensions,
+                object
+                    .bounding
+                    .as_ref()
+                    .is_some_and(|bounding| !bounding.object.is_empty()),
+            )
+        })
+        .collect();
+    for child in &mut layer.objects {
+        if let LayerChild::Object(object) = child {
+            apply_object_bounding(object, &snapshots);
+        }
+    }
+}
+
+fn apply_object_bounding(object: &mut GtObject, snapshots: &[(String, Vec3, Vec3, bool)]) {
+    let Some(bounding) = object.bounding.clone() else {
+        return;
+    };
+    if bounding.object.is_empty() {
+        return;
+    }
+    if !object.visible || object.opacity_value() <= 0.0 {
+        return;
+    }
+    if bounding.object.eq_ignore_ascii_case(&object.name) {
+        return;
+    }
+    let Some((_, location, dimensions, source_bound)) = snapshots
+        .iter()
+        .find(|(name, _, _, _)| name.eq_ignore_ascii_case(&bounding.object))
+    else {
+        return;
+    };
+    if *source_bound {
+        return;
+    }
+    let (left, top, right, bottom) = parse_padding(&bounding.padding);
+    object.location.x = location.x - left;
+    object.location.y = location.y - top;
+    object.dimensions.x = (dimensions.x + left + right).max(1.0);
+    object.dimensions.y = (dimensions.y + top + bottom).max(1.0);
 }
 
 fn parse_padding(raw: &str) -> (f64, f64, f64, f64) {
@@ -138,6 +161,15 @@ fn supported_animation(kind: &str) -> bool {
             | "Spin"
             | "Flip"
             | "ImageSequence"
+            | "ImageSequenceLoop"
+            | "Bounce"
+            | "Expand"
+            | "Scroll"
+            | "Hidden"
+            | "RotateContinuous"
+            | "FillOffset"
+            | "StrokeOffset"
+            | "Blink"
             | "None"
     )
 }

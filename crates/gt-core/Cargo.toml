@@ -13,8 +13,17 @@ quick-xml.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
-tokio.workspace = true
+tokio = { workspace = true, optional = true }
+uuid = { workspace = true, optional = true }
 zip.workspace = true
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+uuid = { workspace = true, optional = true, features = ["v4", "js"] }
+
+[features]
+default = ["fs", "write"]
+fs = ["dep:tokio"]
+write = ["dep:uuid"]
 
 [dev-dependencies]
 pretty_assertions.workspace = true

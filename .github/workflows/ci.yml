@@ -39,4 +39,8 @@ jobs:
         run: cargo test --workspace --locked
 
       - name: CLI smoke
-        run: cargo run -p gt-cli --locked -- convert fixtures/synthetic/basic.gtxml -o /tmp/gt-out
+        run: |
+          cargo run -p gt-cli --locked -- convert fixtures/synthetic/basic.gtxml -o /tmp/gt-out
+          cargo run -p gt-cli --locked -- fields fixtures/synthetic/basic.gtxml
+          cargo run -p gt-cli --locked -- schema
+          cargo run -p gt-cli --locked -- pack fixtures/synthetic/basic.gtxml -o /tmp/gt-out/roundtrip.gtzip

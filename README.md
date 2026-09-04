@@ -1,6 +1,6 @@
 # gt-parser
 
-vMix GT Title Designer の `.gtzip` / `.gtxml` を解析し、HTML に変換する。ロジックは Rust の `gt-core` に置き、CLI から呼び出す。
+vMix GT Title Designer の `.gtzip` / `.gtxml` を解析し、HTML プレビューと GTZIP 書き出しを行う。ロジックは Rust の `gt-core` に置き、CLI / MCP / Wasm から呼び出す。
 
 ## 必要環境
 
@@ -15,47 +15,69 @@ cargo build --release
 
 バイナリ: `target/release/gt-parser`
 
+ブラウザ編集用 Wasm:
+
+```bash
+wasm-pack build crates/gt-wasm --target web --out-dir ../../web/editor/pkg
+```
+
+`web/editor/` を静的サーバで開く。
+
 ## 使い方
 
 ```bash
 # HTML へ変換（outdir/index.html、warnings.json、必要なら outdir/assets/）
 gt-parser convert path/to/title.gtzip -o outdir
-gt-parser convert path/to/title.gtxml -o outdir
+gt-parser convert path/to/title.gtxml -o outdir --embed-assets --storyboard TransitionOut
 
-# 画像を data URI で埋め込み（自己完結 HTML）
-gt-parser convert path/to/title.gtzip -o outdir --embed-assets
+# 自己完結 HTML
+gt-parser preview path/to/title.gtzip -o outdir
 
-# 再生する Storyboard を指定（既定: TransitionIn。Type 省略も TransitionIn）
-gt-parser convert path/to/title.gtzip -o outdir --storyboard TransitionOut
-
-# IR の要約を JSON で表示
+# IR の要約 / フィールド / スキーマ
 gt-parser inspect path/to/title.gtzip
+gt-parser fields path/to/title.gtzip
+gt-parser schema
+
+# IR JSON または既存タイトルから GTZIP を書く
+gt-parser pack ir.json -o out.gtzip --asset folder\\pic.png=./pic.png
+gt-parser pack title.gtzip -o out.gtzip
+
+# MCP（stdio）
+gt-parser mcp
 ```
 
-`-o` を省略すると、入力ファイル名から `{stem}_html` ディレクトリを作る。
+Cursor の MCP 設定例:
 
-## できること（第1〜5段）
+```json
+{
+  "mcpServers": {
+    "gt-parser": {
+      "command": "gt-parser",
+      "args": ["mcp"]
+    }
+  }
+}
+```
 
-- Composition / Layer / TextBlock / Rectangle / Ellipse / Triangle
-- Image（`Image.Bitmap` + `resources.xml` の GUID 対応、GTXML の相対パス）
-- Picture Fill、Linear / Radial Gradient、Size Mode（未指定は縦横比維持の contain、明示の Normal / Stretch / Centered）
-- Bounding + Padding の静的解決、Radius、Rotate
-- Opacity、Shadow、Crop + Feather、Mask、Skew、Texture Flip、Reflection 近似
-- Compositing: Blend は標準。Replace / Additive は `mix-blend-mode` で近似し警告
-- Storyboard: TransitionIn / TransitionOut / Continuous。Reveal / Fade / Fly / ZoomFade / Move / Scale / Rotate
-- Ticker（速度 px/frame、既定 30fps 換算）
-- QR（埋め込み画像優先。生成ライブラリは未導入で警告）
-- Text3D / Cube: 警告付きのベストエフォート近似
-- Image Sequence（`resources.xml` の複数 `<source>` を CSS でループ）
-- UTF-16 / UTF-8 の `document.xml`
-- 未知タグ・属性は捨てずに警告
+LLM は生 `document.xml` を書かず、IR JSON → preview → pack を使う。約束は [docs/AUTHORING.md](docs/AUTHORING.md)。
+
+## できること
+
+- Composition / Layer / TextBlock / Rectangle / Ellipse / Triangle / Image / Ticker
+- 実 GT の Brush（Solid / LinearGradient / RadialGradient / Bitmap）、旧合成タグは読み取り互換
+- Anchor 点、Transform の 3 軸回転、StrokeThickness、DataFlags、Ticker.Template
+- Image Sequence（1 resource・複数 source）
+- Bounding（同一レイヤー、循環ガード、1px 下限、非表示オーナー停止）
+- Storyboard は開放列挙。評価器でスクラブ（ファイルは汚さない）
+- GTZIP 書き出し（UTF-8 BOM なし、GUID 再生成）
+- MCP とブラウザ編集（選択、フィールド、画像アサイン、タイムライン、GTZIP 書き出し）
 
 ## まだできないこと
 
-- 第6段: Wasm グラフィック要素と Web 運用（#7）
-- 第7段: 運用形態（バッチ / 自己完結 HTML の配布形態 / API）（#8）
-- AutoSize=Shrink の実行時追従、DataChangeIn / Out の実行時接続
 - GPU タイトルとのピクセル完全一致
+- ライブ Ticker の 60fps 物理シミュレーション
+- Tauri / GPUI デスクトップ（#9）
+- GT-Plus のガイド、動画書き出し、カーソルワープ式数値スクラブ
 
 ## CI
 

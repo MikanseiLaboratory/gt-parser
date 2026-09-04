@@ -7,7 +7,8 @@ use quick_xml::events::{BytesStart, Event};
 use crate::error::{Error, Result};
 use crate::model::{
     Animation, Bounding, Color, CropEffect, Fill, FillKind, GradientStop, GtDocument, GtObject,
-    Layer, LayerChild, ShadowEffect, Storyboard, UnknownNode, Vec3,
+    Layer, LayerChild, Point2, ShadowEffect, Storyboard, UnknownNode, Vec3, angle_to_points,
+    top_left_from_anchor,
 };
 
 const KNOWN_OBJECT_ATTRS: &[&str] = &[
@@ -26,6 +27,10 @@ const KNOWN_OBJECT_ATTRS: &[&str] = &[
     "LineSpacing",
     "AutoSize",
     "DataFlags",
+    "Anchor",
+    "TextEffect",
+    "StrokeThickness",
+    "Style",
     "Italic",
     "Underline",
     "Strikethrough",
@@ -144,8 +149,17 @@ impl<R: BufRead> Parser<R> {
                 .map(|value| Vec3::parse(value))
                 .unwrap_or_else(Vec3::zero),
             locked: parse_bool(attrs.get("Locked")),
+            visible: attrs
+                .get("Visible")
+                .map(|value| parse_bool(Some(value)))
+                .unwrap_or(true),
+            inner_width: None,
+            inner_height: None,
             objects: Vec::new(),
-            extra_attrs: leftover_attrs(&attrs, &["Name", "Location", "Dimensions", "Locked"]),
+            extra_attrs: leftover_attrs(
+                &attrs,
+                &["Name", "Location", "Dimensions", "Locked", "Visible"],
+            ),
             unknown_children: Vec::new(),
         };
         if empty {
@@ -194,6 +208,11 @@ impl<R: BufRead> Parser<R> {
         empty: bool,
     ) -> Result<()> {
         let tag = local_name(start);
+        if tag == "Composition" {
+            let inner = attributes(start)?;
+            layer.inner_width = parse_f64(inner.get("Width")).or(layer.inner_width);
+            layer.inner_height = parse_f64(inner.get("Height")).or(layer.inner_height);
+        }
         if empty {
             return Ok(());
         }
@@ -202,6 +221,9 @@ impl<R: BufRead> Parser<R> {
                 Event::Start(child) => {
                     let child_tag = local_name(&child);
                     if child_tag == "Composition" {
+                        let inner = attributes(&child)?;
+                        layer.inner_width = parse_f64(inner.get("Width"));
+                        layer.inner_height = parse_f64(inner.get("Height"));
                         self.parse_layer_composition(layer, &child, false)?;
                     } else if child_tag == "Layer" {
                         layer
@@ -247,6 +269,11 @@ impl<R: BufRead> Parser<R> {
         let mut object = GtObject::new(&tag);
         apply_object_attrs(&mut object, &attrs);
         if empty {
+            object.location = top_left_from_anchor(
+                &object.location,
+                &object.dimensions,
+                object.anchor.as_deref(),
+            );
             return Ok(object);
         }
         loop {
@@ -264,6 +291,11 @@ impl<R: BufRead> Parser<R> {
                 _ => {}
             }
         }
+        object.location = top_left_from_anchor(
+            &object.location,
+            &object.dimensions,
+            object.anchor.as_deref(),
+        );
         Ok(object)
     }
 
@@ -283,6 +315,8 @@ impl<R: BufRead> Parser<R> {
         let crop_tag = format!("{object_tag}.Crop");
         let mask_tag = format!("{object_tag}.Mask");
         let template_tag = format!("{object_tag}.Template");
+        let transform_tag = format!("{object_tag}.Transform");
+        let stroke_style_tag = format!("{object_tag}.StrokeStyle");
         if child_tag == fill_tag || child_tag == "Fill" {
             object.fill = self.parse_fill(start, empty, child_tag)?;
         } else if child_tag == stroke_tag || child_tag == "Stroke" {
@@ -301,6 +335,10 @@ impl<R: BufRead> Parser<R> {
             self.parse_mask(object, start, empty, child_tag)?;
         } else if child_tag == template_tag || child_tag == "Template" {
             self.parse_template(object, start, empty, child_tag)?;
+        } else if child_tag == transform_tag || child_tag == "Transform" {
+            self.parse_transform(object, start, empty, child_tag)?;
+        } else if child_tag == stroke_style_tag || child_tag == "StrokeStyle" {
+            self.parse_stroke_style(object, start, empty, child_tag)?;
         } else {
             object
                 .unknown_children
@@ -510,6 +548,7 @@ impl<R: BufRead> Parser<R> {
                     let child_tag = local_name(&child);
                     if is_object_tag(&child_tag) {
                         let nested = self.parse_object(&child, false)?;
+                        object.ticker_template = Some(object_to_template(&nested));
                         if object.text.is_none() {
                             object.text = nested.text.clone();
                         }
@@ -523,13 +562,15 @@ impl<R: BufRead> Parser<R> {
                             object.fill = nested.fill.clone();
                         }
                     } else {
-                        self.skip_to_end(&child_tag)?;
+                        object.ticker_template =
+                            Some(self.parse_unknown(&child, false, &child_tag)?);
                     }
                 }
                 Event::Empty(child) => {
                     let child_tag = local_name(&child);
                     if is_object_tag(&child_tag) {
                         let nested = self.parse_object(&child, true)?;
+                        object.ticker_template = Some(object_to_template(&nested));
                         if object.text.is_none() {
                             object.text = nested.text.clone();
                         }
@@ -694,6 +735,8 @@ impl<R: BufRead> Parser<R> {
             direction: attrs.get("Direction").cloned(),
             reversed: parse_bool(attrs.get("Reverse").or(attrs.get("Reversed"))),
             center_axis: attrs.get("CenterAxis").cloned(),
+            speed: attrs.get("Speed").cloned(),
+            muted: false,
             extra_attrs: leftover_attrs(
                 &attrs,
                 &[
@@ -705,9 +748,78 @@ impl<R: BufRead> Parser<R> {
                     "Reverse",
                     "Reversed",
                     "CenterAxis",
+                    "Speed",
                 ],
             ),
         })
+    }
+
+    fn parse_transform(
+        &mut self,
+        object: &mut GtObject,
+        start: &BytesStart<'_>,
+        empty: bool,
+        tag: &str,
+    ) -> Result<()> {
+        apply_transform(object, &attributes(start)?);
+        if empty {
+            return Ok(());
+        }
+        loop {
+            match self.read()? {
+                Event::Start(child) => {
+                    let child_tag = local_name(&child);
+                    if child_tag == "Transform" {
+                        apply_transform(object, &attributes(&child)?);
+                    }
+                    self.skip_to_end(&child_tag)?;
+                }
+                Event::Empty(child) => {
+                    let child_tag = local_name(&child);
+                    if child_tag == "Transform" {
+                        apply_transform(object, &attributes(&child)?);
+                    }
+                }
+                Event::End(end) if end_name(&end) == tag => break,
+                Event::Eof => return Err(Error::UnexpectedEof("Transform")),
+                _ => {}
+            }
+        }
+        Ok(())
+    }
+
+    fn parse_stroke_style(
+        &mut self,
+        object: &mut GtObject,
+        start: &BytesStart<'_>,
+        empty: bool,
+        tag: &str,
+    ) -> Result<()> {
+        take_dash(object, &attributes(start)?);
+        if empty {
+            return Ok(());
+        }
+        loop {
+            match self.read()? {
+                Event::Start(child) => {
+                    let child_tag = local_name(&child);
+                    if child_tag == "StrokeStyle" {
+                        take_dash(object, &attributes(&child)?);
+                    }
+                    self.skip_to_end(&child_tag)?;
+                }
+                Event::Empty(child) => {
+                    let child_tag = local_name(&child);
+                    if child_tag == "StrokeStyle" {
+                        take_dash(object, &attributes(&child)?);
+                    }
+                }
+                Event::End(end) if end_name(&end) == tag => break,
+                Event::Eof => return Err(Error::UnexpectedEof("StrokeStyle")),
+                _ => {}
+            }
+        }
+        Ok(())
     }
 
     fn parse_unknown(
@@ -794,21 +906,30 @@ fn consider_fill_node(found: &mut Option<Fill>, extras: &mut Vec<UnknownNode>, n
 
 fn fill_from_node(node: &UnknownNode) -> Option<Fill> {
     match node.tag.as_str() {
-        "Brush" => node
-            .attributes
-            .get("Color")
-            .and_then(|value| Color::parse(value))
-            .map(Fill::solid),
-        "LinearGradientBrush" | "LinearGradient" => Some(Fill {
-            kind: FillKind::LinearGradient {
-                angle: parse_f64(node.attributes.get("Angle")).unwrap_or(0.0),
-                wrap: node.attributes.get("Wrap").cloned(),
-                stops: gradient_stops(node),
-            },
-        }),
+        "Brush" => Some(fill_from_brush(node)),
+        "LinearGradientBrush" | "LinearGradient" => {
+            let angle = parse_f64(node.attributes.get("Angle")).unwrap_or(0.0);
+            let (start, end) = angle_to_points(angle);
+            Some(Fill {
+                kind: FillKind::LinearGradient {
+                    start,
+                    end,
+                    wrap: node
+                        .attributes
+                        .get("Wrap")
+                        .cloned()
+                        .or_else(|| node.attributes.get("WrapX").cloned()),
+                    stops: gradient_stops(node),
+                },
+            })
+        }
         "RadialGradientBrush" | "RadialGradient" => Some(Fill {
             kind: FillKind::RadialGradient {
-                wrap: node.attributes.get("Wrap").cloned(),
+                wrap: node
+                    .attributes
+                    .get("Wrap")
+                    .cloned()
+                    .or_else(|| node.attributes.get("WrapX").cloned()),
                 stops: gradient_stops(node),
             },
         }),
@@ -835,6 +956,79 @@ fn fill_from_node(node: &UnknownNode) -> Option<Fill> {
         }
         _ => None,
     }
+}
+
+fn fill_from_brush(node: &UnknownNode) -> Fill {
+    let brush_type = node
+        .attributes
+        .get("Type")
+        .map(|value| value.as_str())
+        .unwrap_or("Solid");
+    match brush_type {
+        "LinearGradient" => {
+            let (default_start, default_end) = angle_to_points(0.0);
+            Fill {
+                kind: FillKind::LinearGradient {
+                    start: node
+                        .attributes
+                        .get("StartPoint")
+                        .and_then(|value| Point2::parse(value))
+                        .unwrap_or(default_start),
+                    end: node
+                        .attributes
+                        .get("EndPoint")
+                        .and_then(|value| Point2::parse(value))
+                        .unwrap_or(default_end),
+                    wrap: node
+                        .attributes
+                        .get("WrapX")
+                        .cloned()
+                        .or_else(|| node.attributes.get("Wrap").cloned()),
+                    stops: gradient_stops(node),
+                },
+            }
+        }
+        "RadialGradient" => Fill {
+            kind: FillKind::RadialGradient {
+                wrap: node
+                    .attributes
+                    .get("WrapX")
+                    .cloned()
+                    .or_else(|| node.attributes.get("Wrap").cloned()),
+                stops: gradient_stops(node),
+            },
+        },
+        "Bitmap" => {
+            let source = bitmap_source_from_node(node).unwrap_or_default();
+            Fill {
+                kind: FillKind::Picture {
+                    source,
+                    size_mode: node.attributes.get("SizeMode").cloned(),
+                    extra: BTreeMap::new(),
+                },
+            }
+        }
+        _ => node
+            .attributes
+            .get("Color")
+            .and_then(|value| Color::parse(value))
+            .map(Fill::solid)
+            .unwrap_or_else(Fill::transparent),
+    }
+}
+
+fn bitmap_source_from_node(node: &UnknownNode) -> Option<String> {
+    if let Some(source) = node.attributes.get("Source") {
+        return Some(source.clone());
+    }
+    for child in &node.children {
+        if (child.tag == "Brush.Bitmap" || child.tag == "Bitmap")
+            && let Some(source) = bitmap_source_from_node(child)
+        {
+            return Some(source);
+        }
+    }
+    None
 }
 
 fn gradient_stops(node: &UnknownNode) -> Vec<GradientStop> {
@@ -876,6 +1070,39 @@ fn collect_stops(node: &UnknownNode, stops: &mut Vec<GradientStop>) {
 fn take_bitmap_source(object: &mut GtObject, attrs: &BTreeMap<String, String>) {
     if let Some(source) = attrs.get("Source").cloned() {
         object.image_source = Some(source);
+    }
+    if let Some(position) = parse_f64(attrs.get("Position")) {
+        object.bitmap_position = Some(position);
+    }
+}
+
+fn apply_transform(object: &mut GtObject, attrs: &BTreeMap<String, String>) {
+    if let Some(raw) = attrs.get("Rotate").or(attrs.get("Rotation")) {
+        let parsed = Vec3::parse(raw);
+        object.rotate_xyz = Some(parsed);
+        object.rotate = Some(parsed.z.to_degrees());
+    }
+}
+
+fn take_dash(object: &mut GtObject, attrs: &BTreeMap<String, String>) {
+    if let Some(dash) = attrs.get("DashStyle").cloned() {
+        object.stroke.dash_style = Some(dash);
+    }
+}
+
+fn object_to_template(object: &GtObject) -> UnknownNode {
+    let mut attributes = BTreeMap::new();
+    if !object.name.is_empty() {
+        attributes.insert("Name".to_string(), object.name.clone());
+    }
+    if let Some(text) = &object.text {
+        attributes.insert("Text".to_string(), text.clone());
+    }
+    UnknownNode {
+        tag: object.tag.clone(),
+        attributes,
+        children: object.unknown_children.clone(),
+        text: None,
     }
 }
 
@@ -991,9 +1218,27 @@ fn apply_object_attrs(object: &mut GtObject, attrs: &BTreeMap<String, String>) {
     object.style.italic = parse_bool(attrs.get("Italic"));
     object.style.underline = parse_bool(attrs.get("Underline"));
     object.style.strikethrough = parse_bool(attrs.get("Strikethrough"));
-    object.style.auto_upper_case = parse_bool(attrs.get("AutoUpperCase"));
+    object.style.text_effect = attrs.get("TextEffect").cloned();
+    object.style.auto_upper_case = parse_bool(attrs.get("AutoUpperCase"))
+        || object
+            .style
+            .text_effect
+            .as_deref()
+            .is_some_and(|value| value.eq_ignore_ascii_case("Uppercase"));
     object.style.rtl = parse_bool(attrs.get("RTL"));
-    object.rotate = parse_f64(attrs.get("Rotate").or(attrs.get("Rotation")));
+    object.anchor = attrs.get("Anchor").cloned();
+    object.data_flags = attrs.get("DataFlags").cloned();
+    object.locked = parse_bool(attrs.get("Locked"));
+    object.rect_style = attrs.get("Style").cloned();
+    if let Some(raw) = attrs.get("Rotate").or(attrs.get("Rotation")) {
+        let parsed = Vec3::parse(raw);
+        if raw.split(',').count() >= 3 {
+            object.rotate_xyz = Some(parsed);
+            object.rotate = Some(parsed.z.to_degrees());
+        } else {
+            object.rotate = Some(parsed.x);
+        }
+    }
     object.radius = parse_f64(attrs.get("Radius"));
     object.opacity = parse_f64(attrs.get("Opacity"));
     object.visible = attrs
@@ -1016,7 +1261,7 @@ fn apply_object_attrs(object: &mut GtObject, attrs: &BTreeMap<String, String>) {
     if let Some(source) = attrs.get("Source") {
         object.image_source = Some(source.clone());
     }
-    if let Some(thickness) = parse_f64(attrs.get("Thickness")) {
+    if let Some(thickness) = parse_f64(attrs.get("StrokeThickness").or(attrs.get("Thickness"))) {
         object.stroke.thickness = Some(thickness);
     }
     object.extra_attrs = leftover_attrs(attrs, KNOWN_OBJECT_ATTRS);
@@ -1039,22 +1284,11 @@ fn is_object_tag(tag: &str) -> bool {
 }
 
 fn is_animation_tag(tag: &str) -> bool {
-    matches!(
-        tag,
-        "Reveal"
-            | "Fade"
-            | "Move"
-            | "Scale"
-            | "Rotate"
-            | "Flip"
-            | "Wipe"
-            | "Fly"
-            | "Zoom"
-            | "Spin"
-            | "ZoomFade"
-            | "ImageSequence"
-            | "None"
-    ) || (!tag.contains('.') && (tag.ends_with("Animation") || tag.ends_with("Fade")))
+    !tag.contains('.')
+        && !matches!(
+            tag,
+            "Composition" | "Layer" | "Storyboard" | "Storyboard.Animations" | "Animations"
+        )
 }
 
 fn parse_f64(value: Option<&String>) -> Option<f64> {

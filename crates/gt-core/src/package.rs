@@ -5,7 +5,10 @@ use std::path::{Path, PathBuf};
 use zip::ZipArchive;
 
 use crate::error::{Error, Result};
-use crate::model::{FillKind, GtDocument, flatten_objects};
+#[cfg(feature = "fs")]
+use crate::model::GtDocument;
+#[cfg(feature = "fs")]
+use crate::model::{FillKind, flatten_objects};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PackageKind {
@@ -31,6 +34,7 @@ pub struct Package {
 }
 
 impl Package {
+    #[cfg(feature = "fs")]
     pub async fn open(path: impl AsRef<Path>) -> Result<Self> {
         let path = path.as_ref().to_path_buf();
         let ext = path
@@ -111,6 +115,7 @@ impl Package {
             .collect()
     }
 
+    #[cfg(feature = "fs")]
     pub async fn load_external_images(&mut self, document: &GtDocument) -> Result<()> {
         if self.kind != PackageKind::Gtxml {
             return Ok(());
@@ -194,6 +199,7 @@ impl Package {
     }
 }
 
+#[cfg(feature = "fs")]
 fn collect_image_sources(document: &GtDocument) -> Vec<String> {
     let mut sources = Vec::new();
     for layer in &document.layers {
