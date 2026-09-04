@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GT Editor</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <strong>GT Editor</strong>
+    <input id="file" type="file" accept=".gtzip,.gtxml,.xml,.json">
+    <button id="export-gtzip" type="button">Export GTZIP</button>
+    <button id="export-html" type="button">Export HTML</button>
+    <label>Storyboard <select id="storyboard"></select></label>
+    <span id="status"></span>
+  </header>
+  <main>
+    <section id="stage-wrap">
+      <gt-graphic id="graphic"></gt-graphic>
+    </section>
+    <aside>
+      <h2>Object</h2>
+      <label>Name <input id="prop-name" readonly></label>
+      <label>Text <textarea id="prop-text"></textarea></label>
+      <label>X <input id="prop-x" type="number"></label>
+      <label>Y <input id="prop-y" type="number"></label>
+      <label>W <input id="prop-w" type="number"></label>
+      <label>H <input id="prop-h" type="number"></label>
+      <label>Visible <input id="prop-visible" type="checkbox" checked></label>
+      <label>Image <input id="prop-image" type="file" accept="image/*"></label>
+      <h2>IR JSON</h2>
+      <textarea id="ir" spellcheck="false"></textarea>
+      <button id="apply-ir" type="button">Apply IR</button>
+    </aside>
+  </main>
+  <section id="timeline">
+    <div id="transport">
+      <button id="play" type="button">Play</button>
+      <button id="stop" type="button">Stop</button>
+      <label><input id="preview" type="checkbox" checked> Preview</label>
+      <label>Hold <input id="hold" type="number" value="2" min="0" step="0.1"></label>
+      <span id="time-label">0.00 / 0.00s</span>
+      <label>Zoom <input id="zoom" type="range" min="20" max="160" value="60"></label>
+      <button id="add-anim" type="button">+ Animation</button>
+      <button id="del-anim" type="button">Delete</button>
+      <select id="anim-type">
+        <option>Fade</option><option>Fly</option><option>Reveal</option>
+        <option>ZoomFade</option><option>Rotate</option><option>Scroll</option>
+        <option>Hidden</option><option>RotateContinuous</option>
+      </select>
+      <span id="tl-warn"></span>
+    </div>
+    <canvas id="track" height="180"></canvas>
+    <div id="props">
+      <label>Delay <input id="anim-delay" type="number" step="0.01"></label>
+      <label>Duration <input id="anim-duration" type="number" step="0.01"></label>
+      <label>Reverse <input id="anim-reverse" type="checkbox"></label>
+      <label>Interpolation
+        <select id="anim-ease">
+          <option>Linear</option>
+          <option>CubicEasingInOut</option>
+          <option>CubicEasingIn</option>
+          <option>CubicEasingOut</option>
+        </select>
+      </label>
+      <label>Direction
+        <select id="anim-dir">
+          <option>Left</option><option>Right</option><option>Top</option><option>Bottom</option>
+          <option>Center</option><option>TopLeft</option><option>TopRight</option>
+          <option>BottomLeft</option><option>BottomRight</option>
+        </select>
+      </label>
+    </div>
+  </section>
+  <script type="module" src="editor.js"></script>
+</body>
+</html>

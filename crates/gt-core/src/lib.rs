@@ -1,19 +1,29 @@
 //! Convert vMix GT Title Designer packages into an intermediate document and HTML.
 
+pub mod anim;
+pub mod edit;
 pub mod error;
+pub mod fields;
 pub mod model;
 pub mod package;
 pub mod parse;
 pub mod render;
 pub mod resolve;
+pub mod schema;
 pub mod warn;
+#[cfg(feature = "write")]
+pub mod write;
 
+#[cfg(feature = "fs")]
 use std::path::Path;
 
 pub use error::{Error, Result};
+pub use fields::DataField;
 pub use model::{GtDocument, InspectReport};
 pub use package::Package;
 pub use warn::Warning;
+#[cfg(feature = "write")]
+pub use write::{WriteAssets, serialize_document_xml, write_gtzip_bytes};
 
 #[derive(Debug, Clone)]
 pub struct ConvertOptions {
@@ -44,10 +54,12 @@ pub struct Conversion {
     pub assets: Vec<OutputAsset>,
 }
 
+#[cfg(feature = "fs")]
 pub async fn convert_path(path: impl AsRef<Path>) -> Result<Conversion> {
     convert_path_with(path, ConvertOptions::default()).await
 }
 
+#[cfg(feature = "fs")]
 pub async fn convert_path_with(
     path: impl AsRef<Path>,
     options: ConvertOptions,
@@ -85,6 +97,7 @@ pub fn convert_package_with(
     })
 }
 
+#[cfg(feature = "fs")]
 pub async fn inspect_path(path: impl AsRef<Path>) -> Result<InspectReport> {
     Ok(convert_path(path).await?.document.inspect_report())
 }

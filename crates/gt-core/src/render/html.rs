@@ -243,7 +243,17 @@ impl<'a> Renderer<'a> {
     fn effect_css(&mut self, object: &GtObject) -> String {
         let mut css = String::new();
         let mut transforms = Vec::new();
-        if let Some(rotate) = object.rotate {
+        if let Some(xyz) = &object.rotate_xyz {
+            if xyz.x.abs() > 1e-9 {
+                transforms.push(format!("rotateX({:.3}deg)", xyz.x.to_degrees()));
+            }
+            if xyz.y.abs() > 1e-9 {
+                transforms.push(format!("rotateY({:.3}deg)", xyz.y.to_degrees()));
+            }
+            if xyz.z.abs() > 1e-9 {
+                transforms.push(format!("rotate({:.3}deg)", xyz.z.to_degrees()));
+            }
+        } else if let Some(rotate) = object.rotate {
             transforms.push(format!("rotate({rotate:.3}deg)"));
         }
         if let Some(skew) = &object.effects.skew {
@@ -500,14 +510,18 @@ impl<'a> Renderer<'a> {
             FillKind::Transparent | FillKind::Unsupported { .. } => {
                 ("none".to_string(), String::new())
             }
-            FillKind::LinearGradient { angle, wrap, stops } => {
+            FillKind::LinearGradient {
+                start,
+                end,
+                wrap,
+                stops,
+            } => {
                 self.gradient_id += 1;
                 let id = format!("gt-lg-{}", self.gradient_id);
-                let rad = angle.to_radians();
-                let x1 = 50.0 - rad.cos() * 50.0;
-                let y1 = 50.0 - rad.sin() * 50.0;
-                let x2 = 50.0 + rad.cos() * 50.0;
-                let y2 = 50.0 + rad.sin() * 50.0;
+                let x1 = start.x * 100.0;
+                let y1 = start.y * 100.0;
+                let x2 = end.x * 100.0;
+                let y2 = end.y * 100.0;
                 let mut stops_xml = String::new();
                 for stop in stops {
                     stops_xml.push_str(&format!(
@@ -754,14 +768,15 @@ fn size_mode_css(mode: Option<&str>) -> String {
         Some("centered") | Some("center") => {
             "object-fit:contain;object-position:center;".to_string()
         }
-        _ => "object-fit:contain;object-position:0 0;".to_string(),
+        Some("topright") => "object-fit:none;object-position:100% 0;".to_string(),
+        _ => "object-fit:contain;object-position:center;".to_string(),
     }
 }
 
 fn stroke_css(stroke: &Stroke, _object: &GtObject) -> (String, f64) {
     match &stroke.fill.kind {
-        FillKind::Solid { color } => (esc_attr(&color.to_css()), stroke.thickness.unwrap_or(1.0)),
-        _ => ("none".to_string(), 0.0),
+        FillKind::Solid { color } => (esc_attr(&color.to_css()), stroke.thickness.unwrap_or(0.0)),
+        _ => ("none".to_string(), stroke.thickness.unwrap_or(0.0)),
     }
 }
 

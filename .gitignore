@@ -1,5 +1,6 @@
 /target
 /out
+/web/editor/pkg
 **/*.rs.bk
 .idea/
 .vscode/

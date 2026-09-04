@@ -1,0 +1,57 @@
+html, body {
+  margin: 0;
+  height: 100%;
+  font: 13px/1.4 system-ui, sans-serif;
+}
+header {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 8px;
+  border-bottom: 1px solid #ccc;
+  flex-wrap: wrap;
+}
+main {
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  min-height: 0;
+  height: calc(100% - 280px);
+}
+#stage-wrap {
+  overflow: auto;
+  background: #ddd;
+}
+aside {
+  border-left: 1px solid #ccc;
+  padding: 8px;
+  overflow: auto;
+}
+aside label, #props label, #transport label {
+  display: block;
+  margin: 6px 0;
+}
+textarea, input, select, button {
+  font: inherit;
+}
+#ir, #prop-text {
+  width: 100%;
+  min-height: 80px;
+}
+#timeline {
+  border-top: 1px solid #ccc;
+  height: 230px;
+}
+#transport, #props {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 4px 8px;
+  flex-wrap: wrap;
+}
+#track {
+  width: 100%;
+  display: block;
+  background: #111;
+}
+#tl-warn { color: #a60; }
+#status { color: #555; }

@@ -40,8 +40,12 @@ pub enum Error {
     #[error("JSON error: {0}")]
     Json(#[from] serde_json::Error),
 
+    #[cfg(feature = "fs")]
     #[error("tokio task join error: {0}")]
     Join(#[from] tokio::task::JoinError),
+
+    #[error("{0}")]
+    Invalid(String),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

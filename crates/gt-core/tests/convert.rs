@@ -296,3 +296,148 @@ async fn gtzip_with_resources_maps_guid_images() {
     assert!(conversion.html.contains("data-gt-type=\"Image\""));
     assert!(conversion.html.contains("assets/"));
 }
+
+#[tokio::test]
+async fn real_gt_brush_type_is_not_flattened_to_solid() {
+    let xml = r##"<Composition Width="100" Height="100">
+  <Layer Name="L" Dimensions="100,100,0" Location="0,0,0">
+    <Layer.Composition>
+      <Composition Width="100" Height="100">
+        <Rectangle Name="Grad" Dimensions="80,40,0" Location="50,30,0" Anchor="MiddleCenter" StrokeThickness="2">
+          <Rectangle.Fill>
+            <Brush Type="LinearGradient" Color="#FFFFFFFF" StartPoint="0,0.5" EndPoint="1,0.5">
+              <Brush.Stops>
+                <GradientStop Color="#FFFF0000" />
+                <GradientStop Position="1" Color="#FF0000FF" />
+              </Brush.Stops>
+            </Brush>
+          </Rectangle.Fill>
+        </Rectangle>
+      </Composition>
+    </Layer.Composition>
+  </Layer>
+</Composition>"##;
+    let document = gt_core::parse::parse_document(xml).unwrap();
+    let rect = match &document.layers[0].objects[0] {
+        gt_core::model::LayerChild::Object(object) => object,
+        _ => panic!("expected object"),
+    };
+    assert!((rect.location.x - 10.0).abs() < f64::EPSILON);
+    assert_eq!(rect.anchor.as_deref(), Some("MiddleCenter"));
+    assert_eq!(rect.stroke.thickness, Some(2.0));
+    match &rect.fill.kind {
+        FillKind::LinearGradient {
+            start, end, stops, ..
+        } => {
+            assert!((start.x - 0.0).abs() < f64::EPSILON);
+            assert!((end.x - 1.0).abs() < f64::EPSILON);
+            assert_eq!(stops.len(), 2);
+        }
+        other => panic!("expected linear gradient, got {other:?}"),
+    }
+}
+
+#[tokio::test]
+async fn write_gtzip_round_trips_objects_and_sequences() {
+    let png = tokio::fs::read(fixture("tiny.png")).await.unwrap();
+    let conversion = convert_path(fixture("basic.gtxml")).await.unwrap();
+    let mut assets = gt_core::WriteAssets::default();
+    assets.insert("folder\\tiny.png", png.clone());
+    assets.sequences.insert(
+        "folder\\tiny.png".to_string(),
+        vec!["folder\\tiny.png".to_string()],
+    );
+    let bytes = gt_core::write_gtzip_bytes(&conversion.document, &assets).unwrap();
+    let package = Package::from_zip_bytes(PathBuf::from("roundtrip.gtzip"), &bytes).unwrap();
+    assert!(package.document_xml.contains("HERE WE ARE"));
+    assert!(package.document_xml.contains("utf-8"));
+    assert!(!package.document_xml.as_bytes().starts_with(&[0xFF, 0xFE]));
+    let again = convert_package(&package).unwrap();
+    assert_eq!(again.document.width, 1920.0);
+    assert_eq!(
+        again.document.layers[0].objects.len(),
+        conversion.document.layers[0].objects.len()
+    );
+}
+
+#[tokio::test]
+async fn write_gtzip_keeps_sequence_sources_and_brush_type() {
+    let png = tokio::fs::read(fixture("tiny.png")).await.unwrap();
+    let xml = r##"<Composition Width="20" Height="20">
+  <Layer Name="L" Dimensions="20,20,0">
+    <Layer.Composition>
+      <Composition Width="20" Height="20">
+        <Rectangle Name="Grad" Dimensions="10,10,0" Location="5,5,0" Anchor="MiddleCenter" DataFlags="ShowVisible">
+          <Rectangle.Fill>
+            <Brush Type="LinearGradient" StartPoint="0,0.5" EndPoint="1,0.5">
+              <Brush.Stops>
+                <GradientStop Color="#FFFF0000" />
+                <GradientStop Position="1" Color="#FF0000FF" />
+              </Brush.Stops>
+            </Brush>
+          </Rectangle.Fill>
+        </Rectangle>
+        <Image Name="Seq" Dimensions="10,10,0" Location="0,0,0">
+          <Image.Bitmap><Bitmap Source="folder\frame1.png"/></Image.Bitmap>
+        </Image>
+      </Composition>
+    </Layer.Composition>
+  </Layer>
+</Composition>"##;
+    let document = gt_core::parse::parse_document(xml).unwrap();
+    let mut assets = gt_core::WriteAssets::default();
+    assets.insert("folder\\frame1.png", png.clone());
+    assets.insert("folder\\frame2.png", png);
+    assets.sequences.insert(
+        "folder\\frame1.png".to_string(),
+        vec![
+            "folder\\frame1.png".to_string(),
+            "folder\\frame2.png".to_string(),
+        ],
+    );
+    let bytes = gt_core::write_gtzip_bytes(&document, &assets).unwrap();
+    let package = Package::from_zip_bytes(PathBuf::from("seq.gtzip"), &bytes).unwrap();
+    assert!(package.document_xml.contains("Type=\"LinearGradient\""));
+    assert!(package.document_xml.contains("DataFlags=\"ShowVisible\""));
+    assert!(package.document_xml.contains("Anchor=\"MiddleCenter\""));
+    assert_eq!(
+        package
+            .resources
+            .path_to_sequence
+            .values()
+            .next()
+            .map(Vec::len)
+            .unwrap_or(0),
+        2
+    );
+}
+
+#[test]
+fn open_animation_types_are_kept() {
+    let xml = r#"<Composition Width="10" Height="10">
+  <Layer Name="L" Dimensions="10,10,0"><Layer.Composition><Composition Width="10" Height="10">
+    <Rectangle Name="R" Dimensions="10,10,0" Location="0,0,0" DataFlags="ShowVisible"/>
+  </Composition></Layer.Composition></Layer>
+  <Storyboard Type="Continuous">
+    <Storyboard.Animations>
+      <RotateContinuous Object="R" Speed="2" Direction="Right"/>
+      <Blink Object="R"/>
+    </Storyboard.Animations>
+  </Storyboard>
+</Composition>"#;
+    let document = gt_core::parse::parse_document(xml).unwrap();
+    assert_eq!(document.storyboards[0].animations.len(), 2);
+    assert_eq!(
+        document.storyboards[0].animations[0].kind,
+        "RotateContinuous"
+    );
+    assert_eq!(
+        document.storyboards[0].animations[0].speed.as_deref(),
+        Some("2")
+    );
+    let rect = match &document.layers[0].objects[0] {
+        gt_core::model::LayerChild::Object(object) => object,
+        _ => panic!("object"),
+    };
+    assert_eq!(rect.data_flags.as_deref(), Some("ShowVisible"));
+}
